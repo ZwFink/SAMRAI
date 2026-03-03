@@ -11,3 +11,44 @@ of the libraries. The only required library is boost. HDF5 is enabled by
 default but can be turned off by passing the argument `-DENABLE_HDF5=Off` to
 CMake.  More extensive instructions on building and installing SAMRAI using
 CMake are available in the INSTALL-NOTES file.
+
+
+Building SAMRAI with Proteus (MI300A / HIP):
+
+  A self-contained build script is provided for building SAMRAI with GPU
+  support on MI300A (gfx942) using ROCm, HIP, RAJA, Umpire, and the Proteus
+  JIT compiler. The script downloads and builds all TPL dependencies
+  (CAMP, Umpire, Proteus, RAJA JIT branch) then builds SAMRAI itself.
+
+  Prerequisites:
+    - TOSS 4 (Cray) system with MI300A GPUs
+    - ROCm 6.4.0 (rocmcc compiler)
+    - cray-mpich 8.1.31 (GPU-aware MPI)
+    - CMake 3.29+
+
+  Full build (TPLs + SAMRAI):
+
+    ./build_samrai_mi300a.sh
+
+  Build only TPL dependencies:
+
+    ./build_samrai_mi300a.sh --tpl-only
+
+  Rebuild only SAMRAI (after TPLs are already built):
+
+    ./build_samrai_mi300a.sh --samrai-only
+
+  The build produces:
+    - TPL installs in tpl_build_mi300a/install/
+    - SAMRAI build in build_mi300a/
+
+  Key build options enabled:
+    - ENABLE_HIP=On             GPU offloading via HIP
+    - ENABLE_RAJA=On            RAJA portability layer
+    - ENABLE_UMPIRE=On          Umpire memory management
+    - RAJA_ENABLE_JIT=On        JIT compilation via Proteus
+    - ENABLE_SAMRAI_DEVICE_ALLOC=On   MPI buffers stay on device (GPU-aware MPI)
+
+  Runtime environment:
+    - Set MPICH_GPU_SUPPORT_ENABLED=1 before running
+    - LD_LIBRARY_PATH may need /usr/tce/packages/cce/cce-17.0.0-magic/cce/x86_64/lib
