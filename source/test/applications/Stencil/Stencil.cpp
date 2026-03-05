@@ -34,6 +34,7 @@ Stencil::Stencil(
    const int num_variables = input_db->getIntegerWithDefault("num_variables", 1);
 
    d_tag_threshold = input_db->getDoubleWithDefault("tag_threshold", 0.5);
+   d_compute_loops = input_db->getIntegerWithDefault("compute_loops", 1);
 
    d_rho_update = std::make_shared<pdat::CellVariable<double> >(dim, "update", d_allocator, 1);
 
@@ -176,6 +177,7 @@ Stencil::conservativeDifferenceOnPatch(
 
       const double dx = pgeom->getDx()[0];
       const double dy = pgeom->getDx()[1];
+      const int compute_loops = d_compute_loops;
       for ( const auto& rho_var : d_rho_variables ) {
          auto rho = pdat::get_view<2, pdat::CellData<double>>(patch.getPatchData(rho_var, getDataContext()));
 
@@ -185,11 +187,16 @@ Stencil::conservativeDifferenceOnPatch(
          const double an_tb = d_velocity[1] * 0.5;
 
          hier::parallel_for_all(patch.getBox(), [=] SAMRAI_HOST_DEVICE (int j, int k) {
-            const double FL = (rho(j-1,k) + rho(j,k)) * an_abs_lr + (rho(j-1,k) - rho(j,k)) * an_lr;
-            const double FR = (rho(j,k) + rho(j+1,k)) * an_abs_lr + (rho(j,k) - rho(j+1,k)) * an_lr;
-            const double FT = (rho(j,k) + rho(j,k+1)) * an_abs_tb + (rho(j,k) - rho(j,k+1)) * an_tb;
-            const double FB = (rho(j,k-1) + rho(j,k)) * an_abs_tb + (rho(j,k-1) - rho(j,k)) * an_tb;
-            rho_new(j,k) = rho(j,k) - dt * (1.0 / dx * (FR - FL) + 1.0 / dy * (FT - FB));
+            const double center = rho(j,k);
+            double result = 0.0;
+            for (int cl = 0; cl < compute_loops; ++cl) {
+               const double FL = (rho(j-1,k) + center) * an_abs_lr + (rho(j-1,k) - center) * an_lr;
+               const double FR = (center + rho(j+1,k)) * an_abs_lr + (center - rho(j+1,k)) * an_lr;
+               const double FT = (center + rho(j,k+1)) * an_abs_tb + (center - rho(j,k+1)) * an_tb;
+               const double FB = (rho(j,k-1) + center) * an_abs_tb + (rho(j,k-1) - center) * an_tb;
+               result += center - dt * (1.0 / dx * (FR - FL) + 1.0 / dy * (FT - FB));
+            }
+            rho_new(j,k) = result / compute_loops;
          });
 
          hier::parallel_for_all(patch.getBox(), [=] SAMRAI_HOST_DEVICE (int j, int k) {
@@ -202,6 +209,7 @@ Stencil::conservativeDifferenceOnPatch(
       const double dx = pgeom->getDx()[0];
       const double dy = pgeom->getDx()[1];
       const double dz = pgeom->getDx()[2];
+      const int compute_loops = d_compute_loops;
       for ( const auto& rho_var : d_rho_variables ) {
          auto rho = pdat::get_view<3, pdat::CellData<double>>(patch.getPatchData(rho_var, getDataContext()));
 
@@ -213,13 +221,18 @@ Stencil::conservativeDifferenceOnPatch(
          const double an_K = d_velocity[2] * 0.5;
 
          hier::parallel_for_all(patch.getBox(), [=] SAMRAI_HOST_DEVICE (int i, int j, int k) {
-            const double IL = (rho(i-1,j,k) + rho(i,j,k)) * an_abs_I + (rho(i-1,j,k) - rho(i,j,k)) * an_I;
-            const double IH = (rho(i,j,k) + rho(i+1,j,k)) * an_abs_I + (rho(i,j,k) - rho(i+1,j,k)) * an_I;
-            const double JL = (rho(i,j,k) + rho(i,j-1,k)) * an_abs_J + (rho(i,j,k) - rho(i,j-1,k)) * an_J;
-            const double JH = (rho(i,j+1,k) + rho(i,j,k)) * an_abs_J + (rho(i,j+1,k) - rho(i,j,k)) * an_J;
-            const double KL = (rho(i,j,k) + rho(i,j,k-1)) * an_abs_K + (rho(i,j,k) - rho(i,j,k-1)) * an_K;
-            const double KH = (rho(i,j,k+1) + rho(i,j,k)) * an_abs_K + (rho(i,j,k+1) - rho(i,j,k)) * an_K;
-            rho_new(i,j,k) = rho(i,j,k) - dt * (1.0 / dx * (IH - IL) + 1.0 / dy * (JH - JL) + 1.0 / dz * (KH - KL));
+            const double center = rho(i,j,k);
+            double result = 0.0;
+            for (int cl = 0; cl < compute_loops; ++cl) {
+               const double IL = (rho(i-1,j,k) + center) * an_abs_I + (rho(i-1,j,k) - center) * an_I;
+               const double IH = (center + rho(i+1,j,k)) * an_abs_I + (center - rho(i+1,j,k)) * an_I;
+               const double JL = (center + rho(i,j-1,k)) * an_abs_J + (center - rho(i,j-1,k)) * an_J;
+               const double JH = (rho(i,j+1,k) + center) * an_abs_J + (rho(i,j+1,k) - center) * an_J;
+               const double KL = (center + rho(i,j,k-1)) * an_abs_K + (center - rho(i,j,k-1)) * an_K;
+               const double KH = (rho(i,j,k+1) + center) * an_abs_K + (rho(i,j,k+1) - center) * an_K;
+               result += center - dt * (1.0 / dx * (IH - IL) + 1.0 / dy * (JH - JL) + 1.0 / dz * (KH - KL));
+            }
+            rho_new(i,j,k) = result / compute_loops;
          });
 
          hier::parallel_for_all(patch.getBox(), [=] SAMRAI_HOST_DEVICE (int i, int j, int k) {

@@ -76,7 +76,13 @@ int main(
    * Initialize tbox::MPI.
    */
 
-  tbox::SAMRAI_MPI::init(&argc, &argv);
+  int provided;
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+  if (provided < MPI_THREAD_MULTIPLE) {
+    std::cerr << "WARNING: MPI_THREAD_MULTIPLE not supported (got "
+              << provided << ")" << std::endl;
+  }
+  tbox::SAMRAI_MPI::init(MPI_COMM_WORLD);
   tbox::SAMRAIManager::initialize();
 
   /*
@@ -397,6 +403,7 @@ int main(
            }
            tbox::pout << "Solution norm: " << std::scientific << std::setprecision(12) << norm << std::endl;
        }
+
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -465,5 +472,6 @@ int main(
 
   tbox::SAMRAIManager::finalize();
   tbox::SAMRAI_MPI::finalize();
+  MPI_Finalize();
   return(0);
 }

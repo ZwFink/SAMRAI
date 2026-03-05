@@ -217,7 +217,8 @@ build_proteus() {
         -DLLVM_INSTALL_DIR="${LLVM_DIR}" \
         -DPROTEUS_ENABLE_HIP=On \
         -DPROTEUS_ENABLE_CUDA=Off \
-        -DPROTEUS_ENABLE_MPI=Off \
+        -DPROTEUS_ENABLE_MPI=On \
+        -DMPI_CXX_COMPILER="${MPICXX}" \
         -DENABLE_TESTS=Off \
         -DBUILD_SHARED=Off
 

@@ -177,6 +177,8 @@ class Stencil :
 #endif
 
     double d_tag_threshold;
+
+    int d_compute_loops;      // redundant compute loops for arithmetic intensity
 };
 
 #endif
